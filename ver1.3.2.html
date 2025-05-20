@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ISBN スキャン & 書誌情報リスト</title>
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 1rem;
+    }
+    video {
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid #ccc;
+      margin-bottom: 1rem;
+    }
+    table {
+      border-collapse: collapse;
+      margin-top: 1rem;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+    }
+    input[type="text"] {
+      width: 300px;
+      padding: 6px;
+      margin-right: 5px;
+    }
+    button {
+      padding: 6px 12px;
+      margin-right: 5px;
+    }
+  </style>
+</head>
+<body>
+
+<h2>ISBN バーコードスキャン & 書誌情報リスト</h2>
+
+<video id="video" autoplay></video>
+
+<div>
+  <label for="isbnInput">ISBNを手入力：</label>
+  <input type="text" id="isbnInput" placeholder="978から始まるISBN">
+  <button onclick="handleManualISBN()">追加</button>
+</div>
+
+<h3>書誌情報リスト</h3>
+<table id="bookTable">
+  <thead>
+    <tr>
+      <th>ISBN</th>
+      <th>タイトル</th>
+      <th>シリーズ</th>
+      <th>著者</th>
+      <th>著者カナ</th>
+      <th>レーベル</th>
+      <th>出版社</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<div style="margin-top: 1rem;">
+  <button onclick="copyToClipboard()">コピー</button>
+  <button onclick="downloadCSV()">CSV保存</button>
+  <button onclick="clearList()">クリア</button>
+</div>
+
+<audio id="beep" src="バーコードリーダー.mp3" preload="auto"></audio>
+
+<script>
+  const codeReader = new ZXing.BrowserBarcodeReader();
+  const videoElement = document.getElementById('video');
+  const bookTableBody = document.querySelector('#bookTable tbody');
+  const isbnInput = document.getElementById('isbnInput');
+  const beep = document.getElementById('beep');
+  const seenISBNs = new Set();
+
+  // カメラ起動
+  codeReader.getVideoInputDevices()
+    .then(videoInputDevices => {
+      const firstDeviceId = videoInputDevices[0].deviceId;
+      codeReader.decodeFromVideoDevice(firstDeviceId, 'video', (result, err) => {
+        if (result) {
+          const isbn = result.text;
+          if (isbn.startsWith("978")) {
+            fetchBookInfo(isbn);
+          }
+        }
+      });
+    })
+    .catch(err => console.error(err));
+
+  function handleManualISBN() {
+    const isbn = isbnInput.value.trim();
+    if (isbn.startsWith("978")) {
+      fetchBookInfo(isbn);
+      isbnInput.value = "";
+    } else {
+      alert("有効なISBNコードを入力してください（978で始まる）");
+    }
+  }
+
+  function fetchBookInfo(isbn) {
+    fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`)
+      .then(res => res.json())
+      .then(data => {
+        const book = data[0];
+        if (book && book.summary) {
+          const rawTitle = book.summary.title || "";
+          const rawSeries = book.summary.series || "";
+          const rawAuthor = book.summary.author || "";
+          const rawPublisher = book.summary.publisher || "";
+          const rawAuthorKana = extractAuthorKana(book.onix);
+
+          const title = sanitizeText(rawTitle);
+          const series = sanitizeText(rawSeries);
+          const author = sanitizeText(rawAuthor);
+          const publisher = sanitizeText(rawPublisher);
+          const authorKana = sanitizeText(rawAuthorKana);
+
+          if (!isDuplicateISBN(isbn)) {
+            addBookToTable(isbn, title, series, author, authorKana, "", publisher);
+            seenISBNs.add(isbn);
+          }
+        }
+      })
+      .catch(err => {
+        console.error("API取得エラー:", err);
+      });
+  }
+
+  function extractAuthorKana(onix) {
+    try {
+      const contributors = onix?.DescriptiveDetail?.Contributor;
+      if (Array.isArray(contributors)) {
+        return contributors
+          .map(c => c?.PersonName?.collationkey?.trim())
+          .filter(kana => kana)
+          .join(" ");
+      }
+    } catch (e) {
+      console.error("著者カナの取得エラー:", e);
+    }
+    return "";
+  }
+
+  function sanitizeText(text) {
+    return text.replace(/,/g, "").replace(/"/g, "").trim();
+  }
+
+  function isDuplicateISBN(isbn) {
+    const rows = bookTableBody.querySelectorAll("tr");
+    for (let row of rows) {
+      const cell = row.querySelector("td");
+      if (cell && cell.textContent === isbn) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function addBookToTable(isbn, title, series, author, authorKana, label, publisher) {
+    const tr = document.createElement('tr');
+    [isbn, title, series, author, authorKana, label, publisher].forEach(text => {
+      const td = document.createElement('td');
+      td.contentEditable = true;
+      td.textContent = text;
+      tr.appendChild(td);
+    });
+    bookTableBody.appendChild(tr);
+    beep.play(); // 音を再生（リスト追加時）
+  }
+
+  function generateCSV() {
+    const rows = [];
+    const headers = ["ISBN", "タイトル", "シリーズ", "著者", "著者カナ", "レーベル", "出版社"];
+    rows.push(headers.join(","));
+
+    bookTableBody.querySelectorAll("tr").forEach(row => {
+      const cells = Array.from(row.querySelectorAll("td")).map(td => {
+        return td.textContent.trim();
+      });
+      rows.push(cells.join(","));
+    });
+
+    return rows.join("\r\n");
+  }
+
+  function downloadCSV() {
+    const csv = generateCSV();
+    const bom = "\uFEFF";
+    const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "books.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function copyToClipboard() {
+    const csv = generateCSV();
+    navigator.clipboard.writeText(csv).then(() => {
+      alert("クリップボードにコピーしました！");
+    }).catch(err => {
+      alert("コピーに失敗しました: " + err);
+    });
+  }
+
+  function clearList() {
+    if (confirm("すべての書誌情報を削除しますか？")) {
+      bookTableBody.innerHTML = "";
+      seenISBNs.clear();
+      localStorage.clear();
+    }
+  }
+</script>
+
+</body>
+</html>
