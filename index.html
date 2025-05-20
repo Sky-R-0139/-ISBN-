@@ -104,34 +104,58 @@
     }
   }
 
-  function fetchBookInfo(isbn) {
-    fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`)
-      .then(res => res.json())
-      .then(data => {
-        const book = data[0];
-        if (book && book.summary) {
-          const rawTitle = book.summary.title || "";
-          const rawSeries = book.summary.series || "";
-          const rawAuthor = book.summary.author || "";
-          const rawPublisher = book.summary.publisher || "";
-          const rawAuthorKana = extractAuthorKana(book.onix);
+function fetchBookInfo(isbn) {
+  fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`)
+    .then(res => res.json())
+    .then(data => {
+      const book = data[0];
+      if (book && book.summary) {
+        const rawTitle = book.summary.title || "";
+        const rawSeries = book.summary.series || "";
+        const rawAuthor = book.summary.author || "";
+        const rawPublisher = book.summary.publisher || "";
+        const rawAuthorKana = extractAuthorKana(book.onix);
 
-          const title = sanitizeText(rawTitle);
-          const series = sanitizeText(rawSeries);
-          const author = sanitizeText(rawAuthor);
-          const publisher = sanitizeText(rawPublisher);
-          const authorKana = sanitizeText(rawAuthorKana);
+        const title = sanitizeText(rawTitle);
+        const series = sanitizeText(rawSeries);
+        const author = sanitizeText(rawAuthor);
+        const publisher = sanitizeText(rawPublisher);
+        const authorKana = sanitizeText(rawAuthorKana);
 
-          if (!isDuplicateISBN(isbn)) {
-            addBookToTable(isbn, title, series, author, authorKana, "", publisher);
-            seenISBNs.add(isbn);
-          }
+        if (!isDuplicateISBN(isbn)) {
+          // ✅ 書誌情報オブジェクトを作成
+          const bookInfo = {
+            isbn,
+            title,
+            series,
+            author,
+            authorKana,
+            label: "", // ラベルは空欄（手動編集）
+            publisher
+          };
+
+          addBookToTable(
+            bookInfo.isbn,
+            bookInfo.title,
+            bookInfo.series,
+            bookInfo.author,
+            bookInfo.authorKana,
+            bookInfo.label,
+            bookInfo.publisher
+          );
+
+          // ✅ Googleスプレッドシートに送信
+          sendToSheet(bookInfo);
+
+          seenISBNs.add(isbn);
         }
-      })
-      .catch(err => {
-        console.error("API取得エラー:", err);
-      });
-  }
+      }
+    })
+    .catch(err => {
+      console.error("API取得エラー:", err);
+    });
+}
+
 
   function extractAuthorKana(onix) {
     try {
