@@ -220,5 +220,29 @@
   }
 </script>
 
+  function sendToSheet(entry) {
+  const url = "https://script.google.com/macros/s/AKfycbzRsakWMYPggJ1j0hYMTzj2R799UdSJPCCsF6N9EQim5zNGKHAD3gYdW7YmklC_hKxSrg/exec"; // あなたの Web App URL に置き換え
+
+  fetch(url, {
+    method: "POST",
+    mode: "no-cors", // 成功応答は得られないが必要
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      isbn: entry.isbn,
+      title: entry.title,
+      series: entry.series,
+      author: entry.author,
+      authorKana: entry.authorKana,
+      publisher: entry.publisher,
+      label: entry.label
+    }),
+  })
+  .then(() => console.log("✅ 送信完了"))
+  .catch((error) => console.error("送信失敗", error));
+}
+
+
 </body>
 </html>
