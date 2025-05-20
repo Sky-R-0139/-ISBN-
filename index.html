@@ -145,9 +145,11 @@ function addBookToTable(book) {
     td.textContent = text;
     tr.appendChild(td);
   });
-  bookTableBody.appendChild(tr);
+  bookTableBody.insertBefore(tr, bookTableBody.firstChild);
+
   beep.play();
 }
+
 
 function generateCSV() {
   const rows = [];
