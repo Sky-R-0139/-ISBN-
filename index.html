@@ -199,7 +199,13 @@ function sendAllToSheet() {
       author: cells[3].textContent.trim(),
       authorKana: cells[4].textContent.trim(),
       publisher: cells[5].textContent.trim(),
-      label: cells[6].textContent.trim()
+      label: cells[6].textContent.trim(),
+
+      // 以下はGASとの整合性のために追加（空欄送信でもOK）
+      seriesKana: "",
+      volume: "",
+      publisherKana: "",
+      labelKana: ""
     };
   });
 
@@ -221,6 +227,7 @@ function sendAllToSheet() {
     .then(() => alert("✅ 書誌情報を送信しました"))
     .catch((error) => alert("送信失敗: " + error));
 }
+
 </script>
 </body>
 </html>
