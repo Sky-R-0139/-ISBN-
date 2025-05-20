@@ -102,10 +102,34 @@ function fetchBookInfo(isbn) {
           addBookToTable(bookInfo);
           seenISBNs.add(isbn);
         }
+      } else {
+        // 書誌情報が取得できなかった場合
+        handleMissingBookInfo(isbn);
       }
     })
-    .catch(err => console.error("API取得エラー:", err));
+    .catch(err => {
+      console.error("API取得エラー:", err);
+      handleMissingBookInfo(isbn);
+    });
 }
+
+  function handleMissingBookInfo(isbn) {
+  if (!isDuplicateISBN(isbn)) {
+    const bookInfo = {
+      isbn,
+      title: "",
+      series: "",
+      author: "",
+      authorKana: "",
+      publisher: "",
+      label: ""
+    };
+    addBookToTable(bookInfo);
+    seenISBNs.add(isbn);
+    alert("書誌情報を取得できませんでした。各種情報を手動で入力してください。");
+  }
+}
+
 
 function extractAuthorKana(onix) {
   try {
