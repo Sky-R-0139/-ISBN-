@@ -165,7 +165,7 @@
 
   function addBookToTable(isbn, title, series, author, authorKana, label, publisher) {
     const tr = document.createElement('tr');
-    [isbn, title, series, author, authorKana, label, publisher].forEach(text => {
+    [isbn, title, series, author, authorKana, publisher, label].forEach(text => {
       const td = document.createElement('td');
       td.contentEditable = true;
       td.textContent = text;
